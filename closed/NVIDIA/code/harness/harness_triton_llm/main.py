@@ -219,15 +219,8 @@ if __name__ == "__main__":
     # model_name_prefix = llm_config.model_name.lower() + '-' + args.scenario.lower()
     model_name_prefix = 'model'
 
-    http_port = G_DEFAULT_PORTS['http']
-    grpc_port = G_DEFAULT_PORTS['grpc']
-    metrics_port = G_DEFAULT_PORTS['metrics']
     if not args.skip_server_spawn:
         raise NotImplementedError("On this fork, please launch tritonservers independantly, then use --skip_server_spawn in harness")
-        backend = TritonSutBackend(model_name_prefix=model_name_prefix, model_repo=args.model_repo, num_gpus=args.num_gpus)
-        grpc_port = backend.get_grpc_port()
-        http_port = backend.get_http_port()
-        metrics_port = backend.get_metrics_port()
 
     children_processes = []
     children_input_queues = []
