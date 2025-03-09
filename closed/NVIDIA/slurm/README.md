@@ -11,6 +11,21 @@ srun --container-image=nvcr.io/nvidia/tritonserver:24.12-trtllm-python-py3 --con
 ```
 Now, you can use `image_name.sqsh` for all subsequent runs
 
+## Quantization
+First it's required to quantize the model to nvfp4. Use the [tensorrt_llm/examples/quantization/quantize.py script](https://github.com/NVIDIA/TensorRT-LLM/blob/main/examples/quantization/quantize.py)
+```
+python3 tensorrt_llm/examples/quantization/quantize.py \
+    --dtype float16 \
+    --qformat nvfp4 \
+    --kv_cache_dtype fp8 \
+    --calib_size 1024  \
+    --tp_size 1 \
+    --pp_size 1 \
+    --calib_dataset build/preprocessed_data/open_orca/mlperf_llama2_openorca_calibration_1k/ \
+    --output_dir <path_to_quantized_ckpnt> \
+    --model_dir <HF_model_ckpnt_path> 
+```
+
 ## Engine build
 In order to build an engine, use the following command:
 
