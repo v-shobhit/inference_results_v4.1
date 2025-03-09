@@ -36,6 +36,25 @@ class OfflineGPUBaseConfig(GPUBaseConfig):
     kvcache_free_gpu_mem_frac = 0.90
     min_duration = 2400000
 
+class BlackwellOfflineGPUBaseConfig(GPUBaseConfig):
+    scenario = Scenario.Offline
+    gpu_copy_streams = 1
+    gpu_inference_streams = 1
+    precision = "fp4"
+    min_duration = 3_600_000
+
+@ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP)
+class GB200_NVL_186GB_ARMx4(BlackwellOfflineGPUBaseConfig):
+    system = KnownSystem.GB200_NVL4
+    gpu_batch_size = {'llama2-70b': 2048}
+    offline_expected_qps = 45 * 4
+    max_num_tokens = 3584
+    kvcache_free_gpu_mem_frac = 0.97
+
+
+@ConfigRegistry.register(HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP)
+class GB200_NVL_186GB_ARMx4_Triton(GB200_NVL_186GB_ARMx4):
+    use_triton = True
 
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP)
 class GH200_144GB_aarch64x1(OfflineGPUBaseConfig):

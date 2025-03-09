@@ -36,6 +36,26 @@ class ServerGPUBaseConfig(GPUBaseConfig):
     kvcache_free_gpu_mem_frac = 0.90
     min_duration = 2400000
 
+class BlackwellServerGPUBaseConfig(GPUBaseConfig):
+    scenario = Scenario.Server
+    gpu_copy_streams = 1
+    gpu_inference_streams = 1
+    tensor_parallelism = 1
+    pipeline_parallelism = 1
+    precision = "fp4"
+    kvcache_free_gpu_mem_frac = 0.97
+
+@ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP)
+class GB200_NVL_186GB_ARMx4(BlackwellServerGPUBaseConfig):
+    system = KnownSystem.GB200_NVL4
+    gpu_batch_size = {'llama2-70b': 2048}
+    max_num_tokens = 3584
+    kvcache_free_gpu_mem_frac = 0.97
+    server_target_qps = 40 * 4
+
+@ConfigRegistry.register(HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP)
+class GB200_NVL_186GB_ARMx4_Triton(GB200_NVL_186GB_ARMx4):
+    use_triton = True
 
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP)
 class GH200_144GB_aarch64x1(ServerGPUBaseConfig):
