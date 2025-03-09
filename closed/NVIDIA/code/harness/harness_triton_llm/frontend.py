@@ -183,7 +183,7 @@ class TritonSutGrpcFrontend(ITritonSutFrontend):
         super().__init__(*args, **kwargs)
 
     def handle_queries_callback(self, result, error):
-        assert error is None, "Inference not successful"
+        assert error is None, f"Inference not successful: {error}"
         self.queries_responded += 1
 
         sample_id = int(result.get_response().id)
@@ -277,7 +277,7 @@ class TritonSutGrpcStreamFrontend(ITritonSutFrontend):
         output_ids_tensor = result.as_numpy("output_ids")
         output_len_tensor = result.as_numpy("sequence_length")
         n_tokens = output_len_tensor[0, 0]
-        recvd_token = output_ids_tensor[0, 0]
+        recvd_token = output_ids_tensor[0, 0][0]
         assert n_tokens == 1
         assert recvd_token != self.llm_config.end_token_id
         is_final = response.parameters.get("triton_final_response").bool_param
@@ -335,7 +335,12 @@ class TritonSutGrpcStreamFrontend(ITritonSutFrontend):
             output_ids.append(self.llm_config.end_token_id)
 
             seq_len = len(output_ids)
-            output_ids_tensor = np.asarray(output_ids, dtype=np.int32).reshape(1, -1)
+            
+            try:
+                output_ids_tensor = np.asarray(output_ids, dtype=np.int32).reshape(1, -1)
+            except ValueError as e:
+                logging.info(f"Error {e} on converting {output_ids} to np array")
+                raise e
 
             if self.report_loadgen_queue is None:
                 curr_qsr = lg.QuerySampleResponse(sample_id, output_ids_tensor.ctypes.data, 4 * seq_len, seq_len)

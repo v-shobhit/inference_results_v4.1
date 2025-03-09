@@ -155,8 +155,10 @@ def parse_args():
     parser.add_argument("--verbose_frontend", action="store_true", help="Make triton frontend verbose, this enables logging of stats")
     parser.add_argument("--protocol", type=str, default="grpc", help="Protocol to use for triton client-server communication")
     parser.add_argument("--model_repo", type=str, default="/work/build/triton_model_repo", help="Model repo path for tritonserver")
-    parser.add_argument("--num_clients_per_gpu", type=int, default=1, help="Number of triton clients per GPU. Total number of clients are (num_gpus * num_clients_per_gpu)")
+    parser.add_argument("--num_clients_per_gpu", type=int, default=1, help="Number of triton clients per GPU.")
+    parser.add_argument("--num_frontends_per_gpu", type=int, default=1, help="Number of triton frontends (client processes) per GPU.")
     parser.add_argument("--use_token_latencies", type=bool, help="Ask loadgen to record token latencies or not")
+    parser.add_argument("--grpc_ports_file", type=str, help="Path to the JSON file specifying grpc endpoint mapping for each GPU-Node combination", default="")
 
     args, _ = parser.parse_known_args()
     assert args.num_gpus > 0, "num GPUs must be a positive integer"
@@ -166,6 +168,18 @@ def parse_args():
 if __name__ == "__main__":
     mp.set_start_method('spawn')
     args = parse_args()
+
+    if args.grpc_ports_file == "":
+        if args.scenario == "Offline":
+            grpc_port_mapping = {"localhost": [8001] * args.num_gpus}
+        elif args.scenario == "Server":
+            grpc_port_mapping = {"localhost": [8001, 8002, 8003, 8004]}
+        else:
+            raise NotImplementedError
+    else:
+        raise NotImplementedError
+
+
     llm_config = get_llm_gen_config(args.model, args.scenario, args.llm_gen_config_path)
 
     # Initialize settings
@@ -212,29 +226,32 @@ if __name__ == "__main__":
         http_port = backend.get_http_port()
         metrics_port = backend.get_metrics_port()
 
-    grpc_url = f"0.0.0.0:{grpc_port}"
-
     children_processes = []
     children_input_queues = []
     children_ready_queues = []
     children_output_queues = []
+
+    models_per_server = 4 if args.scenario == "Offline" else 1
     for gpu_idx in range(args.num_gpus):
         # spawn a child process that will hold a frontend.
         # This frontend will be responsible for sending queries to GPU #{gpu_idx}
-        triton_model_name = model_name_prefix + '-' + str(gpu_idx)
-        frontend_input_queue = mp.Queue(maxsize=1000)
-        frontend_output_queue = mp.Queue(maxsize=1000)
-        frontend_ready_queue = mp.Queue()
+        triton_model_name = model_name_prefix + '-' + str((gpu_idx % models_per_server))
+        grpc_port = grpc_port_mapping["localhost"][gpu_idx] # TODO: Remove hardcoding (node_idx, node_name)
+        grpc_url = f"localhost:{grpc_port}"
+        for frontend_idx in range(args.num_frontends_per_gpu):
+            frontend_input_queue = mp.Queue(maxsize=1000)
+            frontend_output_queue = mp.Queue(maxsize=1000)
+            frontend_ready_queue = mp.Queue()
 
-        child = mp.Process(target=frontend_process, args=(frontend_class, frontend_input_queue,
-                                                          triton_model_name, grpc_url, dataset,
-                                                          llm_config, args, frontend_ready_queue,
-                                                          frontend_output_queue))
-        children_processes.append(child)
-        children_input_queues.append(frontend_input_queue)
-        children_output_queues.append(frontend_output_queue)
-        children_ready_queues.append(frontend_ready_queue)
-        child.start()
+            child = mp.Process(target=frontend_process, args=(frontend_class, frontend_input_queue,
+                                                              triton_model_name, grpc_url, dataset,
+                                                              llm_config, args, frontend_ready_queue,
+                                                              frontend_output_queue))
+            children_processes.append(child)
+            children_input_queues.append(frontend_input_queue)
+            children_output_queues.append(frontend_output_queue)
+            children_ready_queues.append(frontend_ready_queue)
+            child.start()
 
     qsr_consumers = []
     for output_queue in children_output_queues:
