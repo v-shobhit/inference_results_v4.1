@@ -200,7 +200,8 @@ if __name__ == "__main__":
     if llm_config.streaming:
         frontend_class = TritonSutGrpcStreamFrontend
 
-    model_name_prefix = llm_config.model_name.lower() + '-' + args.scenario.lower()
+    # model_name_prefix = llm_config.model_name.lower() + '-' + args.scenario.lower()
+    model_name_prefix = 'model'
 
     http_port = G_DEFAULT_PORTS['http']
     grpc_port = G_DEFAULT_PORTS['grpc']

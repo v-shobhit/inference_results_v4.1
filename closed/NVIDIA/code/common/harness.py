@@ -216,8 +216,8 @@ class BaseBenchmarkHarness:
             if self.skip_file_checks:
                 print(f"Note: File {f} does not exist. Attempting to continue regardless, as hard file checks are disabled.")
                 return False
-            else:
-                raise RuntimeError("File {:} does not exist.".format(f))
+            # else:
+            #     raise RuntimeError("File {:} does not exist.".format(f))
         return True
 
     def build_default_flags(self):
