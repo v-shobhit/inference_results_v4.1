@@ -19,7 +19,7 @@
 
 MAKEFILE_NAME := $(lastword $(MAKEFILE_LIST))  # Must be declared before includes
 include $(CURDIR)/Makefile.const
-include $(CURDIR)/Makefile.docker
+# include $(CURDIR)/Makefile.docker
 include $(CURDIR)/Makefile.build
 include $(CURDIR)/Makefile.data
 include $(CURDIR)/Makefile.tests

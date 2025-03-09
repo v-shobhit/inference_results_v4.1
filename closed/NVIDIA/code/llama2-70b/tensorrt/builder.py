@@ -87,20 +87,20 @@ class LLAMA2EngineBuilder(TRTBuilder,
 
         # https://gitlab-master.nvidia.com/ftp/tekit/-/tree/main/examples/llama?ref_type=heads#fp8-post-training-quantization
         # Please refer to README.md for quantization.
-        if self.use_fp8:
-            if not self.fp8_quant_model_path.exists():
-                raise FileNotFoundError(f"Could not locate Llama2 fp8 quantized checkpoint model path: ({self.fp8_quant_model_path}). Please check README.md")
-                # TODO If the default model does not exist, build a quantized model locally
-                # self.need_quantization = True
-        else:
-            raise NotImplementedError(f"Only fp8 supported as of now. Set precision to FP16 and use_fp8 to True. If you need to perform quantization, please refer to README.md")
+        # if self.use_fp8:
+        #     if not self.fp8_quant_model_path.exists():
+        #         raise FileNotFoundError(f"Could not locate Llama2 fp8 quantized checkpoint model path: ({self.fp8_quant_model_path}). Please check README.md")
+        #         # TODO If the default model does not exist, build a quantized model locally
+        #         # self.need_quantization = True
+        # else:
+        #     raise NotImplementedError(f"Only fp8 supported as of now. Set precision to FP16 and use_fp8 to True. If you need to perform quantization, please refer to README.md")
 
         self.trt_llm_path = Path(trt_llm_path)
 
-        if self.precision == "fp8":
-            raise NotImplementedError(f"To enable FP8 precision, set precision to FP16 and use_fp8 to True.")
-        elif self.precision != Precision.FP16:
-            raise NotImplementedError(f"Precision {self.precision} is not supported yet.")
+        # if self.precision == "fp8":
+        #     raise NotImplementedError(f"To enable FP8 precision, set precision to FP16 and use_fp8 to True.")
+        # elif self.precision != Precision.FP16:
+        #     raise NotImplementedError(f"Precision {self.precision} is not supported yet.")
 
     def build_quantized_model(self):
         """
