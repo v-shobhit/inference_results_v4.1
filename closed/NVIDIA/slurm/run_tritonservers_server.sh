@@ -29,7 +29,7 @@ node_list=$(scontrol show hostnames $SLURM_NODELIST)
 
 ### Launch tritonserver on each node
 for node in $node_list; do
-    $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.txt --mpi=pmix /work/slurm/run_server_nvl4.sh &
+    $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /work/slurm/run_server_nvl4.sh &
 done
 
 ### SIGINT the tritonservers manually to exit the job:
