@@ -139,7 +139,7 @@ def parse_args():
     parser.add_argument("--dispatcher_type", type=str, choices=["sequential", "mlperf"], default="mlperf", help="The dispatching behavior of queries.")
 
     # Config args
-    parser.add_argument("--performance_sample_count", type=int, default=5000, help="Number of samples to run benchmark on")
+    parser.add_argument("--performance_sample_count", type=int, default=24576, help="Number of samples to run benchmark on")
     parser.add_argument("--mlperf_conf_path", help="Path to mlperf.conf", default="build/loadgen-configs/DGX-H100_H100-SXM-80GBx1_TRT/gptj-99/Offline/mlperf.conf")
     parser.add_argument("--user_conf_path", help="Path to user.conf", default="build/loadgen-configs/DGX-H100_H100-SXM-80GBx1_TRT/gptj-99/Offline/user.conf")
 
@@ -162,6 +162,8 @@ def parse_args():
 
     args, _ = parser.parse_known_args()
     assert args.num_gpus > 0, "num GPUs must be a positive integer"
+    assert Path(args.mlperf_conf_path).exists()
+    assert Path(args.user_conf_path).exists()
     return args
 
 
@@ -221,6 +223,7 @@ if __name__ == "__main__":
     grpc_port = G_DEFAULT_PORTS['grpc']
     metrics_port = G_DEFAULT_PORTS['metrics']
     if not args.skip_server_spawn:
+        raise NotImplementedError("On this fork, please launch tritonservers independantly, then use --skip_server_spawn in harness")
         backend = TritonSutBackend(model_name_prefix=model_name_prefix, model_repo=args.model_repo, num_gpus=args.num_gpus)
         grpc_port = backend.get_grpc_port()
         http_port = backend.get_http_port()
