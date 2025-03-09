@@ -177,10 +177,10 @@ if __name__ == "__main__":
         elif args.scenario == "Server":
             grpc_port_mapping = {"localhost": [8001, 8002, 8003, 8004]}
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Got unexpected scenario: {args.scenario}")
     else:
-        raise NotImplementedError
-
+        with open(args.grpc_ports_file) as f:
+            grpc_port_mapping = json.load(f)
 
     llm_config = get_llm_gen_config(args.model, args.scenario, args.llm_gen_config_path)
 
@@ -235,26 +235,27 @@ if __name__ == "__main__":
     children_output_queues = []
 
     models_per_server = 4 if args.scenario == "Offline" else 1
-    for gpu_idx in range(args.num_gpus):
-        # spawn a child process that will hold a frontend.
-        # This frontend will be responsible for sending queries to GPU #{gpu_idx}
-        triton_model_name = model_name_prefix + '-' + str((gpu_idx % models_per_server))
-        grpc_port = grpc_port_mapping["localhost"][gpu_idx] # TODO: Remove hardcoding (node_idx, node_name)
-        grpc_url = f"localhost:{grpc_port}"
-        for frontend_idx in range(args.num_frontends_per_gpu):
-            frontend_input_queue = mp.Queue(maxsize=1000)
-            frontend_output_queue = mp.Queue(maxsize=1000)
-            frontend_ready_queue = mp.Queue()
+    for node_name, port_list in grpc_port_mapping.items():
+        for gpu_idx in range(args.num_gpus):
+            # spawn a child process that will hold a frontend.
+            # This frontend will be responsible for sending queries to GPU #{gpu_idx}
+            triton_model_name = model_name_prefix + '-' + str((gpu_idx % models_per_server))
+            grpc_port = grpc_port_mapping[node_name][gpu_idx]
+            grpc_url = f"{node_name}:{grpc_port}"
+            for frontend_idx in range(args.num_frontends_per_gpu):
+                frontend_input_queue = mp.Queue(maxsize=1000)
+                frontend_output_queue = mp.Queue(maxsize=1000)
+                frontend_ready_queue = mp.Queue()
 
-            child = mp.Process(target=frontend_process, args=(frontend_class, frontend_input_queue,
-                                                              triton_model_name, grpc_url, dataset,
-                                                              llm_config, args, frontend_ready_queue,
-                                                              frontend_output_queue))
-            children_processes.append(child)
-            children_input_queues.append(frontend_input_queue)
-            children_output_queues.append(frontend_output_queue)
-            children_ready_queues.append(frontend_ready_queue)
-            child.start()
+                child = mp.Process(target=frontend_process, args=(frontend_class, frontend_input_queue,
+                                                                  triton_model_name, grpc_url, dataset,
+                                                                  llm_config, args, frontend_ready_queue,
+                                                                  frontend_output_queue))
+                children_processes.append(child)
+                children_input_queues.append(frontend_input_queue)
+                children_output_queues.append(frontend_output_queue)
+                children_ready_queues.append(frontend_ready_queue)
+                child.start()
 
     qsr_consumers = []
     for output_queue in children_output_queues:
