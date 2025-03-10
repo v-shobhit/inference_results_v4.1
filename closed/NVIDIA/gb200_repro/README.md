@@ -89,5 +89,5 @@ Each GPU has 1 instance of llama2-70B model. Say we run on 4 compute nodes. Here
 
 Then, in `gb200_repro/run_harness_offline.sh`, add a flag to the harness run command: `--grpc_ports_file PATH_TO_ABOVE_JSON`
 
-For Server scenario, each host will have different ports since we spawn multiple tritonserver instances on a single host, 1 per GPU. 
-For Offline scenario, a single tritonserver host may be used to launch models on all 4 GPUs, and the ports will be shared (as above) or it may be different
+For Server scenario, each host will have different ports since we spawn multiple tritonserver instances on a single host, 1 per GPU.  
+For Offline scenario, a single tritonserver host may be used to launch models on all 4 GPUs, and the ports will be shared (as above). Else, it may be different indicating multiple different tritonserver instances.
