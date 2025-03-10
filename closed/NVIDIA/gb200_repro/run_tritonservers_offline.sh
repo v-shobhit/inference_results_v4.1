@@ -30,6 +30,7 @@ node_list=$(scontrol show hostnames $SLURM_NODELIST)
 ### Launch tritonserver on each node
 for node in $node_list; do
     $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /opt/tritonserver/bin/tritonserver --model-repository=triton_repos/llama2_offline_nvl4/ --pinned-memory-pool-byte-size=0 --enable-peer-access=false --cuda-memory-pool-byte-size=0:0 --cuda-memory-pool-byte-size=1:0 --cuda-memory-pool-byte-size=2:0 --cuda-memory-pool-byte-size=3:0 --grpc-port=8001 --http-port=8000 --metrics-port=8002 --disable-auto-complete-config --backend-config=python,shm-region-prefix-name=prefix0_ &
+    # $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /work/gb200_repro/run_offline_nvl4.sh &
 done
 
 ### SIGINT the tritonservers manually to exit the job:

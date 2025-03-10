@@ -228,6 +228,7 @@ if __name__ == "__main__":
     children_output_queues = []
 
     models_per_server = 4 if args.scenario == "Offline" else 1
+    # models_per_server = 1
     for node_name, port_list in grpc_port_mapping.items():
         for gpu_idx in range(args.num_gpus):
             # spawn a child process that will hold a frontend.
