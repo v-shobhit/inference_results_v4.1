@@ -152,7 +152,7 @@ class ITritonSutFrontend(ABC):
 
     def wait_for_server_readiness(self, is_server_ready: Callable[[], bool], poll_interval: int = 1):
         server_ready = False
-        logging.info(f"waiting for server/{self.triton_model_name} to be ready")
+        logging.info(f"waiting for server/{self.triton_model_name} at {self.url} to be ready")
         while not server_ready:
             try:
                 server_ready = is_server_ready()
