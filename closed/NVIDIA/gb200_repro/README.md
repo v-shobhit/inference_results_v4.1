@@ -55,7 +55,7 @@ Use the repos in `closed/NVIDIA/triton_repos` to launch tritonserver.
 - In offline scenario, we launch a single tritonserver instance that launches 4 models, one on each GPU
 - In server scenario, we launch 4 tritonserver instances, one that spawns a model on a single GPU. For this, run the script `slurm/run_server_nvl4.sh`
 
-You can use the slurm scripts under `closed/NVIDIA/slurm/run_tritonservers_offline.sh` or `closed/NVIDIA/slurm/run_tritonservers_server.sh` to launch the tritonservers perpetually in a slurm job. 
+You can use the slurm scripts under `closed/NVIDIA/gb200_repro/run_tritonservers_offline.sh` or `closed/NVIDIA/gb200_repro/run_tritonservers_server.sh` to launch the tritonservers perpetually in a slurm job. 
 
 ## Running the benchmark
 Once the tritonservers are launched, we can start a bash terminal in an overlapping job step via:
@@ -66,9 +66,28 @@ srun --jobid=<JOB_ID> --overlap --container-name=mlperf_inference_run_tritonserv
 Once inside the container, run the benchmark as follows.
 ### Offline
 ```
-cd /work && ./slurm/run_harness_offline.sh
+cd /work && ./gb200_repro/run_harness_offline.sh
 ```
 ### Server
 ```
-cd /work && ./slurm/run_harness_server.sh
+cd /work && ./gb200_repro/run_harness_server.sh
 ```
+
+## Extending to multi-node (NVL36 or NVL72)
+For multiple nodes, we need to first write a JSON file that defines the mapping of the `grpc_url` per model.
+
+Each GPU has 1 instance of llama2-70B model. Say we run on 4 compute nodes. Here, we have total 16 llama2-70b instances. In this case, write a JSON file as below:
+
+```
+{
+    "hostname_0": [8001, 8001, 8001, 8001],
+    "hostname_1": [8001, 8001, 8001, 8001],
+    "hostname_2": [8001, 8001, 8001, 8001],
+    "hostname_3": [8001, 8001, 8001, 8001]
+}
+```
+
+Then, in `gb200_repro/run_harness_offline.sh`, add a flag to the harness run command: `--grpc_ports_file PATH_TO_ABOVE_JSON`
+
+For Server scenario, each host will have different ports since we spawn multiple tritonserver instances on a single host, 1 per GPU. 
+For Offline scenario, a single tritonserver host may be used to launch models on all 4 GPUs, and the ports will be shared (as above) or it may be different
