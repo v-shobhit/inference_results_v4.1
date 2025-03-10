@@ -25,15 +25,53 @@ export CONTAINER_MOUNT="$ACTUAL_WORKDIR:$CONTAINER_WORKDIR,/lustre/fsw/gtc_infer
 export SRUN_HEADER="srun --container-image=$CONTAINER_IMAGE --container-mounts=$CONTAINER_MOUNT --container-workdir=$CONTAINER_WORKDIR"
 
 ### Get node names
+format_hostnames() {
+    local hosts=("$@") # Capture all arguments as an array
+    local result=""
+
+    for host in "${hosts[@]}"; do
+        if [[ -n "$result" ]]; then
+            result+=","
+        fi
+        result+=${host}
+    done
+
+    echo $result # Output the formatted string
+}
+
 node_list=$(scontrol show hostnames $SLURM_NODELIST)
+node_names_csv=$(format_hostnames $node_list)
+$SRUN_HEADER --nodes=1 --ntasks-per-node=1 python3 gb200_repro/util/create_mappings_file.py $node_names_csv gb200_repro/grpc_mappings_$SLURM_JOB_ID.json
 
 ### Launch tritonserver on each node
 for node in $node_list; do
-    $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /opt/tritonserver/bin/tritonserver --model-repository=triton_repos/llama2_offline_nvl4/ --pinned-memory-pool-byte-size=0 --enable-peer-access=false --cuda-memory-pool-byte-size=0:0 --cuda-memory-pool-byte-size=1:0 --cuda-memory-pool-byte-size=2:0 --cuda-memory-pool-byte-size=3:0 --grpc-port=8001 --http-port=8000 --metrics-port=8002 --disable-auto-complete-config --backend-config=python,shm-region-prefix-name=prefix0_ &
-    # $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /work/gb200_repro/run_offline_nvl4.sh &
+    # $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /opt/tritonserver/bin/tritonserver --model-repository=triton_repos/llama2_offline_nvl4/ --pinned-memory-pool-byte-size=0 --enable-peer-access=false --cuda-memory-pool-byte-size=0:0 --cuda-memory-pool-byte-size=1:0 --cuda-memory-pool-byte-size=2:0 --cuda-memory-pool-byte-size=3:0 --grpc-port=8001 --http-port=8000 --metrics-port=8002 --disable-auto-complete-config --backend-config=python,shm-region-prefix-name=prefix0_ &
+    $SRUN_HEADER --container-name=$CONTAINER_NAME --nodes=1 --ntasks-per-node=1 -w $node --output=slurm-$SLURM_JOB_ID-$node-tritonserver-log.out --mpi=pmix /work/gb200_repro/run_offline_nvl4.sh &
 done
+
+sleep 30 # wait for servers to load
+
+$SRUN_HEADER --overlap --nodes=1 --ntasks-per-node=1 --container-name=$CONTAINER_NAME-run_harness --output=slurm-$SLURM_JOB_ID-$node-harness-run.out --mpi=pmix python3 -m code.harness.harness_triton_llm.main \
+    --logfile_outdir=/work/build/logs/GB200_NVL4_TRT_Triton_$SLURM_JOB_ID/llama2-70b-99/Offline \
+    --logfile_prefix=mlperf_log_ \
+    --tensor_path=/home/mlperf_inference_storage/preprocessed_data/open_orca/input_ids_padded.npy,/home/mlperf_inference_storage/preprocessed_data/open_orca/input_lens.npy \
+    --llm_gen_config_path=code/llama2-70b/tensorrt/generation_config.json \
+    --use_token_latencies=true \
+    --mlperf_conf_path=gb200_conf_files/Offline/mlperf.conf \
+    --user_conf_path=gb200_conf_files/Offline/user_x$SLURM_JOB_NUM_NODES.conf \
+    --scenario Offline \
+    --model llama2-70b \
+    --num_gpus 4 \
+    --skip_server_spawn \
+    --num_clients_per_gpu 4 \
+    --num_frontends_per_gpu 8 \
+    --grpc_ports_file gb200_repro/grpc_mappings_$SLURM_JOB_ID.json
 
 ### SIGINT the tritonservers manually to exit the job:
 ### srun --jobid=<JOB_ID> --overlap --container-name=mlperf_inference_run_tritonserver pkill -2 tritonserver
+
+for node in $node_list; do
+	$SRUN_HEADER --overlap --container-name=$CONTAINER_NAME --output=slurm-$SLURM_JOB_ID-$node-tritonserver-cleanup.out --nodes=1 --ntasks-per-node=1 -w $node /bin/bash -c 'echo "$(hostname) performing cleanup at time $(date)" && pkill -2 tritonserver'
+done
 
 wait
