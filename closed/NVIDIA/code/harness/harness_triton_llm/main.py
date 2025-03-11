@@ -60,7 +60,7 @@ def flush_queries(frontend_input_queues):
 def dispatch_queries_from_loadgen(frontend_input_queues, dataset, load_balancing_counters, query_samples):
     global G_NUM_DISPATCHED
     num_frontends = len(frontend_input_queues)
-    logging.info(f"Received a sample set of {len(query_sample)} queries from LoadGen"
+    logging.info(f"Received a sample set of {len(query_sample)} queries from LoadGen")
     for query_sample in query_samples:
         next_frontend_idx = load_balancing_counters.index(min(load_balancing_counters))
         sample_input_ids, sample_input_lens = dataset.get_input(query_sample.index)
