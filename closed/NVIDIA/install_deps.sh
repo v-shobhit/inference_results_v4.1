@@ -22,4 +22,5 @@ apt-add-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
 apt install -y cmake
 
 # install loadgen
+cd /work
 make build_loadgen
