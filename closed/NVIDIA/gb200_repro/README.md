@@ -50,6 +50,8 @@ python3 -m tensorrt_llm.commands.build \
     --output_dir=<path_to_engine_build_dir>
 ```
 
+Then, in the tritonserver model repo under `closed/NVIDIA/triton_repos/*/*/config.pbtxt`, change the value of the `gpt_model_path` (around L101) to the path of the TRTLLM engine dir.
+
 ## Running tritonservers to serve Llama2
 Use the repos in `closed/NVIDIA/triton_repos` to launch tritonserver. 
 - In offline scenario, we launch a single tritonserver instance that launches 4 models, one on each GPU
