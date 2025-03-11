@@ -27,8 +27,6 @@ import json
 import multiprocessing as mp
 from functools import partial
 
-G_DEFAULT_PORTS = {'http': 8000, 'grpc': 8001, 'metrics': 8002}
-G_FRONTEND_DISPATCH_IDX = 0
 G_NUM_DISPATCHED = 0
 
 scenario_map = {
@@ -59,15 +57,16 @@ def flush_queries(frontend_input_queues):
         input_queue.put(None)
 
 
-def dispatch_queries_from_loadgen(frontend_input_queues, dataset, query_samples):
-    global G_FRONTEND_DISPATCH_IDX
+def dispatch_queries_from_loadgen(frontend_input_queues, dataset, load_balancing_counters, query_samples):
     global G_NUM_DISPATCHED
     num_frontends = len(frontend_input_queues)
+    logging.info(f"Received a sample set of {len(query_sample)} queries from LoadGen"
     for query_sample in query_samples:
+        next_frontend_idx = load_balancing_counters.index(min(load_balancing_counters))
         sample_input_ids, sample_input_lens = dataset.get_input(query_sample.index)
-        frontend_input_queues[G_FRONTEND_DISPATCH_IDX].put([query_sample.id, sample_input_ids, sample_input_lens], block=True)
-        G_FRONTEND_DISPATCH_IDX += 1
-        G_FRONTEND_DISPATCH_IDX %= num_frontends
+        frontend_input_queues[next_frontend_idx].put([query_sample.id, sample_input_ids, sample_input_lens], block=True)
+        load_balancing_counters[next_frontend_idx] += sample_input_lens[0, 0]
+
         G_NUM_DISPATCHED += 1
         if G_NUM_DISPATCHED % 1000 == 0:
             logging.info(f"Sent {G_NUM_DISPATCHED} samples")
@@ -260,7 +259,8 @@ if __name__ == "__main__":
         _ = queue.get()
         queue.close()
 
-    sut = lg.ConstructSUT(partial(dispatch_queries_from_loadgen, children_input_queues, dataset),
+    load_balancing_counters = [0] * len(children_input_queues)
+    sut = lg.ConstructSUT(partial(dispatch_queries_from_loadgen, children_input_queues, dataset, load_balancing_counters),
                           dummy_flush)
     logging.info("Initialized TritonSUT. Starting benchmark run")
 
