@@ -59,12 +59,13 @@ def flush_queries(frontend_input_queues):
         input_queue.put(None)
 
 
-def dispatch_queries_from_loadgen(frontend_input_queues, query_samples):
+def dispatch_queries_from_loadgen(frontend_input_queues, dataset, query_samples):
     global G_FRONTEND_DISPATCH_IDX
     global G_NUM_DISPATCHED
     num_frontends = len(frontend_input_queues)
     for query_sample in query_samples:
-        frontend_input_queues[G_FRONTEND_DISPATCH_IDX].put(query_sample, block=True)
+        sample_input_ids, sample_input_lens = dataset.get_input(query_sample.index)
+        frontend_input_queues[G_FRONTEND_DISPATCH_IDX].put([query_sample.id, sample_input_ids, sample_input_lens], block=True)
         G_FRONTEND_DISPATCH_IDX += 1
         G_FRONTEND_DISPATCH_IDX %= num_frontends
         G_NUM_DISPATCHED += 1
@@ -76,14 +77,12 @@ def frontend_process(frontend_class: type,
                      input_queue: mp.Queue,
                      triton_model_name: str,
                      grpc_url: str,
-                     dataset: LlmDataset,
                      llm_config: LlmConfig,
                      args: argparse.Namespace,
                      frontend_ready_queue: mp.Queue,
                      output_qsr_queue: mp.Queue):
     logging.info(f"Initializing frontend for {triton_model_name}")
-    frontend = frontend_class(dataset=dataset,
-                              llm_config=llm_config,
+    frontend = frontend_class(llm_config=llm_config,
                               verbose=args.verbose_frontend,
                               triton_model_name=triton_model_name,
                               url=grpc_url,
@@ -95,7 +94,7 @@ def frontend_process(frontend_class: type,
         query_sample = input_queue.get()
         if query_sample is None:
             break
-        frontend.dispatch_query_samples(query_sample)
+        frontend.dispatch_query_sample(query_sample)
     frontend.notify_dispatch_done()
 
 
@@ -242,7 +241,7 @@ if __name__ == "__main__":
                 frontend_ready_queue = mp.Queue()
 
                 child = mp.Process(target=frontend_process, args=(frontend_class, frontend_input_queue,
-                                                                  triton_model_name, grpc_url, dataset,
+                                                                  triton_model_name, grpc_url,
                                                                   llm_config, args, frontend_ready_queue,
                                                                   frontend_output_queue))
                 children_processes.append(child)
@@ -261,7 +260,7 @@ if __name__ == "__main__":
         _ = queue.get()
         queue.close()
 
-    sut = lg.ConstructSUT(partial(dispatch_queries_from_loadgen, children_input_queues),
+    sut = lg.ConstructSUT(partial(dispatch_queries_from_loadgen, children_input_queues, dataset),
                           dummy_flush)
     logging.info("Initialized TritonSUT. Starting benchmark run")
 

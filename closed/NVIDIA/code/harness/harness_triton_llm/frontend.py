@@ -33,7 +33,6 @@ except:
     logging.warning("nvidia-ml-py3 not installed. Utilization stats will not be logged.")
 
 from code.harness.harness_triton_llm.utils import LlmConfig, get_gptj_triton_inputs
-from code.harness.harness_triton_llm.dataset import LlmDataset
 
 
 def get_client(url: str, protocol: str = "http", concurrency: int = 192, verbose: bool = False):
@@ -46,7 +45,6 @@ def get_client(url: str, protocol: str = "http", concurrency: int = 192, verbose
 
 class ITritonSutFrontend(ABC):
     def __init__(self,
-                 dataset: LlmDataset,
                  llm_config: LlmConfig,
                  triton_model_name: str,
                  report_loadgen_queue: Union[queue.Queue, mp.Queue, None] = None,
@@ -68,14 +66,13 @@ class ITritonSutFrontend(ABC):
         self.dispatch_queues = []
         self.dispatchers = []
         self.num_dispatchers = num_clients_per_gpu
-        self._ds = dataset
         self.llm_config = llm_config
         self.triton_batch_size = triton_batch_size
         self.num_queries_dispatched = 0
         self.num_total_queries_dispatched = 0
         self.queries_responded = 0
         self.triton_model_name = triton_model_name
-        self.dispatching_lock = threading.Lock()  # acquired when dispatch_query_samples_called, to guard against premature termination
+        self.dispatching_lock = threading.Lock()  # acquired when dispatch_query_sample called, to guard against premature termination
 
         for _ in range(self.num_dispatchers):
             self.clients.append(get_client(url=url, protocol="grpc", verbose=False))
@@ -104,7 +101,7 @@ class ITritonSutFrontend(ABC):
             if sample is None:
                 dispatch_queue.task_done()
                 break
-            sample_input_ids, sample_input_lens = self._ds.get_input(sample.index)
+            sample_id, sample_input_ids, sample_input_lens = sample
             inputs = get_gptj_triton_inputs(tensor_input_ids=sample_input_ids,
                                             tensor_input_len=sample_input_lens,
                                             llm_config=self.llm_config,
@@ -114,11 +111,11 @@ class ITritonSutFrontend(ABC):
                 outputs.append(grpcclient.InferRequestedOutput(output))
 
             if self.log_stats:
-                self._update_disp_sample_stats(sample.id, sample_input_lens)
+                self._update_disp_sample_stats(sample_id, sample_input_lens)
             if self.llm_config.streaming:
-                client.async_stream_infer(model_name=self.triton_model_name, inputs=inputs, request_id=str(sample.id), outputs=outputs)
+                client.async_stream_infer(model_name=self.triton_model_name, inputs=inputs, request_id=str(sample_id), outputs=outputs)
             else:
-                client.async_infer(model_name=self.triton_model_name, inputs=inputs, callback=grpc_callback, request_id=str(sample.id), outputs=outputs)
+                client.async_infer(model_name=self.triton_model_name, inputs=inputs, callback=grpc_callback, request_id=str(sample_id), outputs=outputs)
 
             self.num_queries_dispatched += 1
             dispatch_queue.task_done()
@@ -137,18 +134,15 @@ class ITritonSutFrontend(ABC):
     def _update_disp_sample_stats(self, sample_id, isl):
         pass
 
-    def dispatch_query_samples(self, query_samples):
+    def dispatch_query_sample(self, query_sample):
         with self.dispatching_lock:
-            if not type(query_samples) is list:
-                query_samples = [query_samples]
-            for query_sample in query_samples:
-                self.dispatch_queues[self.dispatch_idx].put(query_sample)
-                self.num_total_queries_dispatched += 1
-                self.dispatch_idx += 1
-                self.dispatch_idx %= self.num_dispatchers
-                if self.verbose:
-                    if self.num_total_queries_dispatched % 1000 == 0:
-                        logging.info(f"Dispatched {self.num_total_queries_dispatched} samples to {self.triton_model_name}")
+            self.dispatch_queues[self.dispatch_idx].put(query_sample)
+            self.num_total_queries_dispatched += 1
+            self.dispatch_idx += 1
+            self.dispatch_idx %= self.num_dispatchers
+            if self.verbose:
+                if self.num_total_queries_dispatched % 1000 == 0:
+                    logging.info(f"Dispatched {self.num_total_queries_dispatched} samples to {self.triton_model_name}")
 
     def wait_for_server_readiness(self, is_server_ready: Callable[[], bool], poll_interval: int = 1):
         server_ready = False
