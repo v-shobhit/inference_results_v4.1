@@ -98,7 +98,7 @@ parameters: {
 parameters: {
   key: "gpt_model_path"
   value: {
-    string_value: "/home/artefacts/engines/llama2_triton_trtllm_0.17.0post1_fp4_tp1pp1/"
+    string_value: "/home/artefacts/engines/llama2_triton_trtllm_0.18.0dev_fp4_tp1pp1_norm_quant_fusion/"
   }
 }
 parameters: {
