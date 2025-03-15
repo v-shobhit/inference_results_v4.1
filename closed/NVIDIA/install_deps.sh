@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# 1. run trinton server in background 
+bash /work/gb200_repro/run_offline_nvl4.sh
+
+# 2. install loadgen dependencies 
 # install typeguard
 pip install typeguard
 
@@ -24,3 +28,7 @@ apt install -y cmake
 # install loadgen
 cd /work
 make build_loadgen
+
+
+# 3. keep the detached docker running
+while true; do sleep 30; done
