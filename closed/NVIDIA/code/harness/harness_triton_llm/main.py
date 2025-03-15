@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
     if args.grpc_ports_file == "":
         if args.scenario == "Offline":
-            grpc_port_mapping = {"localhost": [8001] * args.num_gpus}
+            grpc_port_mapping = {"localhost": [8001, 8002, 8003, 8004]}
         elif args.scenario == "Server":
             grpc_port_mapping = {"localhost": [8001, 8002, 8003, 8004]}
         else:
